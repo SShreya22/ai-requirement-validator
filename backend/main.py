@@ -1,7 +1,16 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, Form
 from fastapi.responses import FileResponse
 from requirements_ai import extract_requirements, parse_requirements
 from file_generator import generate_word_file, generate_excel_file
+
+# Load API keys from .env file
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+FASTAPI_SECRET_KEY = os.getenv("FASTAPI_SECRET_KEY")
+
+print("Loaded OpenAI API Key:", OPENAI_API_KEY)  # Debugging (remove in production)
 
 app = FastAPI()
 
@@ -22,8 +31,16 @@ async def process_text(text: str = Form(...)):
 
 @app.get("/download-word/")
 async def download_word():
-    return FileResponse("requirements.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename="requirements.docx")
+    return FileResponse(
+        "requirements.docx",
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename="requirements.docx"
+    )
 
 @app.get("/download-excel/")
 async def download_excel():
-    return FileResponse("user_stories.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="user_stories.xlsx")
+    return FileResponse(
+        "user_stories.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="user_stories.xlsx"
+    )
