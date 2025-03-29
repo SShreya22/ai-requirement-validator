@@ -1,0 +1,15 @@
+# Ignore virtual environment
+venv/
+
+# Ignore system files
+__pycache__/
+*.pyc
+*.pyo
+*.DS_Store
+
+# Ignore environment variables (API keys, etc.)
+.env
+
+# Ignore generated files
+*.log
+requirements.txt.lock
