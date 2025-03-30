@@ -39,7 +39,7 @@ async def upload_file(file: UploadFile = File(...)):
 
     # Extract text
     extracted_text = extract_text(file_path)
-    
+
     if extracted_text == "Unsupported file format":
         raise HTTPException(status_code=400, detail="Unsupported file format")
 
@@ -49,10 +49,12 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         # Get response from Gemini API
         gemini_response = get_gemini_response(prompt)
-        if "choices" in gemini_response:
-            extracted_requirements = gemini_response["choices"][0]["message"]["content"]
+
+        # Check if the response contains the expected content
+        if 'candidates' in gemini_response and len(gemini_response['candidates']) > 0:
+            extracted_requirements = gemini_response['candidates'][0]['content']['parts'][0]['text']
         else:
-            extracted_requirements = gemini_response  # Just return the full response if the structure is unexpected
+            extracted_requirements = "No requirements found in the response."
 
         # Generate Word & Excel files
         word_file = generate_word_file(extracted_requirements)
@@ -67,6 +69,7 @@ async def upload_file(file: UploadFile = File(...)):
 
     except Exception as e:
         return {"error": str(e)}
+
 
 # Function to get Gemini API response
 def get_gemini_response(prompt: str):
@@ -118,7 +121,7 @@ def extract_text(file_path):
         df = pd.read_excel(file_path)
         text = df.to_string()
 
-    elif file_ext == "pptx":  # ✅ Added PPTX support
+    elif file_ext == "pptx":
         try:
             prs = Presentation(file_path)
             text = "\n".join([ 
@@ -132,43 +135,60 @@ def extract_text(file_path):
 
     return text
 
-# Requirement Extraction Endpoint (For Direct Text)
-@app.post("/extract-requirements/")
-async def extract_requirements(input_data: RequirementInput):
-    prompt = f"Extract and categorize the following text into Functional and Non-Functional requirements:\n{input_data.text}"
+# Function to generate Word document with categorized requirements
+def generate_word_file(extracted_requirements):
+    # Ensure you are correctly splitting or formatting the extracted content
+    content = extracted_requirements.split("**Non-Functional Requirements:**")
 
-    try:
-        gemini_response = get_gemini_response(prompt)
-        extracted_requirements = gemini_response["contents"][0]["parts"][0]["text"]
+    functional_requirements = content[0] if len(content) > 0 else ""
+    non_functional_requirements = content[1] if len(content) > 1 else ""
 
-        # Generate Word & Excel files
-        word_file = generate_word_file(extracted_requirements)
-        excel_file = generate_excel_file(extracted_requirements)
-
-        return {
-            "message": "Files generated successfully!",
-            "word_file": word_file,
-            "excel_file": excel_file,
-            "requirements": extracted_requirements
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
-
-# Function to generate Word document
-def generate_word_file(requirements):
+    # Generate Word document with proper sections
     doc = Document()
-    doc.add_heading("Extracted Requirements", level=1)
-    doc.add_paragraph(requirements)
-    file_path = "requirements.docx"
-    doc.save(file_path)
-    return file_path
+    doc.add_heading('Extracted Requirements', 0)
+    
+    # Add Functional Requirements
+    doc.add_heading('Functional Requirements', level=1)
+    doc.add_paragraph(functional_requirements.strip())
+
+    # Add Non-Functional Requirements
+    doc.add_heading('Non-Functional Requirements', level=1)
+    doc.add_paragraph(non_functional_requirements.strip())
+
+    # Save the document
+    word_file = "requirements.docx"
+    doc.save(word_file)
+
+    return word_file
+
+# Function to generate Excel file with categorized requirements
+import re
+import pandas as pd
+
+def parse_requirements(extracted_text):
+    # Regex to match the sections
+    functional_requirements = re.search(r"\*\*Functional Requirements\*\*(.*?)\*\*Non-Functional Requirements\*\*", extracted_text, re.DOTALL)
+    non_functional_requirements = re.search(r"\*\*Non-Functional Requirements\*\*(.*)", extracted_text, re.DOTALL)
+    
+    functional_text = functional_requirements.group(1).strip() if functional_requirements else "No functional requirements found."
+    non_functional_text = non_functional_requirements.group(1).strip() if non_functional_requirements else "No non-functional requirements found."
+    
+    return functional_text, non_functional_text
 
 # Function to generate Excel file
 def generate_excel_file(requirements):
-    df = pd.DataFrame({"Requirements": [requirements]})
+    functional_requirements, non_functional_requirements = parse_requirements(requirements)
+    
+    # Create a DataFrame with two columns: Functional Requirements and Non-Functional Requirements
+    data = {
+        "Functional Requirements": [functional_requirements],
+        "Non-Functional Requirements": [non_functional_requirements]
+    }
+    
+    df = pd.DataFrame(data)
     file_path = "user_stories.xlsx"
     df.to_excel(file_path, index=False)
+    
     return file_path
 
 # File Download Routes
