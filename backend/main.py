@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import openai
@@ -74,30 +74,15 @@ async def upload_file(file: UploadFile = File(...)):
 def extract_text(file_path):
     file_ext = file_path.split(".")[-1].lower()
 
-    if not os.path.exists(file_path):
-        return f"Error: File '{file_path}' not found"
-
     if file_ext == "pdf":
         doc = fitz.open(file_path)
         text = "\n".join([page.get_text("text") for page in doc])
-
     elif file_ext in ["doc", "docx"]:
         doc = Document(file_path)
         text = "\n".join([p.text for p in doc.paragraphs])
-
     elif file_ext in ["xls", "xlsx"]:
         df = pd.read_excel(file_path)
         text = df.to_string()
-
-    elif file_ext == "pptx":  # ✅ Added PPTX support
-        try:
-            prs = Presentation(file_path)
-            text = "\n".join([
-                shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")
-            ])
-        except Exception as e:
-            return f"Error extracting text from PPTX: {str(e)}"
-
     else:
         return "Unsupported file format"
 
