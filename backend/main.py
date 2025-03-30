@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+import requests
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import openai
 import fitz
 from pptx import Presentation
 from docx import Document
@@ -11,7 +11,7 @@ import pandas as pd
 
 # Load API key securely
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # FastAPI app setup
 app = FastAPI()
@@ -47,14 +47,12 @@ async def upload_file(file: UploadFile = File(...)):
     prompt = f"Extract and categorize the following text into Functional and Non-Functional requirements:\n{extracted_text}"
 
     try:
-        client = openai.Client()
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": "Hello!"}]
-)
-
-
-        extracted_requirements = response["choices"][0]["message"]["content"]
+        # Get response from Gemini API
+        gemini_response = get_gemini_response(prompt)
+        if "choices" in gemini_response:
+            extracted_requirements = gemini_response["choices"][0]["message"]["content"]
+        else:
+            extracted_requirements = gemini_response  # Just return the full response if the structure is unexpected
 
         # Generate Word & Excel files
         word_file = generate_word_file(extracted_requirements)
@@ -69,6 +67,37 @@ async def upload_file(file: UploadFile = File(...)):
 
     except Exception as e:
         return {"error": str(e)}
+
+# Function to get Gemini API response
+def get_gemini_response(prompt: str):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+
+    headers = {
+        'Content-Type': 'application/json',
+    }
+
+    # Define the data to send the prompt
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
+    }
+
+    # Send the POST request to the Gemini API
+    response = requests.post(url, json=data, headers=headers)
+
+    # Log the response for debugging purposes
+    print("Gemini API Response:", response.json())  # This will print the entire response
+
+    # Handle the response from Gemini
+    if response.status_code == 200:
+        return response.json()  # Return the response content from Gemini
+    else:
+        return {"error": f"API Error: {response.status_code}", "message": response.text}
 
 # Text Extraction Logic
 def extract_text(file_path):
@@ -92,7 +121,7 @@ def extract_text(file_path):
     elif file_ext == "pptx":  # ✅ Added PPTX support
         try:
             prs = Presentation(file_path)
-            text = "\n".join([
+            text = "\n".join([ 
                 shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")
             ])
         except Exception as e:
@@ -109,16 +138,8 @@ async def extract_requirements(input_data: RequirementInput):
     prompt = f"Extract and categorize the following text into Functional and Non-Functional requirements:\n{input_data.text}"
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Analyze the uploaded document."},
-            ]
-        )
-
-
-        extracted_requirements = response["choices"][0]["message"]["content"]
+        gemini_response = get_gemini_response(prompt)
+        extracted_requirements = gemini_response["contents"][0]["parts"][0]["text"]
 
         # Generate Word & Excel files
         word_file = generate_word_file(extracted_requirements)

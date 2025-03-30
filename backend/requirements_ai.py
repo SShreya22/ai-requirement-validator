@@ -1,9 +1,35 @@
-import openai
 import os
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()  # Load API key from .env file
-openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# You will use Gemini API here, so replace OpenAI key with Gemini key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Load the Gemini API key
+
+def get_gemini_response(prompt: str):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+
+    headers = {
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
+    }
+
+    # Send the POST request to the Gemini API
+    response = requests.post(url, json=data, headers=headers)
+    if response.status_code == 200:
+        return response.json()  # Return the response content from Gemini
+    else:
+        return {"error": f"API Error: {response.status_code}", "message": response.text}
 
 def extract_requirements(text: str):
     prompt = f"""
@@ -23,12 +49,13 @@ def extract_requirements(text: str):
     2. ...
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    return response["choices"][0]["message"]["content"]
+    response = get_gemini_response(prompt)
+    
+    # Assuming the response will contain the extracted requirements
+    if "choices" in response:
+        return response["choices"][0]["message"]["content"]
+    else:
+        return {"error": "Failed to extract requirements", "details": response}
 
 def parse_requirements(ai_response: str):
     functional = []
