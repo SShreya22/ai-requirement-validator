@@ -8,8 +8,10 @@ __pycache__/
 *.DS_Store
 
 # Ignore environment variables (API keys, etc.)
-.env
+backend/.env
+**/.env
 
 # Ignore generated files
 *.log
 requirements.txt.lock
+
