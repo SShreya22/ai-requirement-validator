@@ -18,4 +18,12 @@ AI Requirement Validator is an intelligent tool that extracts and generates stru
 - **Structured Output**: Ensures clarity and completeness in requirement documentation.  
 
 ### 📄 Export & Save Options  
-- **Download as Word or Excel**: Save the extracted requirements in user-friendly formats for further use.  
+- **Download as Word or Excel**: Save the extracted requirements in user-friendly formats for further use.
+
+
+### Installation
+To install the dependencies, run the following command in Python:  
+
+```python
+cd backend
+pip install -r requirements.txt
